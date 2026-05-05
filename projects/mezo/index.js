@@ -1,3 +1,4 @@
+const { token } = require("@coral-xyz/anchor/dist/cjs/utils");
 const ADDRESSES = require("../helper/coreAssets.json");
 const { getLiquityTvl } = require("../helper/liquity");
 
@@ -18,8 +19,8 @@ const BRIDGED_TOKENS = [
   "0xCFC5bD99915aAa815401C5a41A927aB7a38d29cf", // thUSD
   "0xCdF7028ceAB81fA0C6971208e83fa7872994beE5", // T (Threshold Network) → mT
   "0xC96dE26018A54D51c097160568752c4E3BD6C364", // FBTC → mFBTC
-  MUSD_ETHEREUM ,//MUSD ethereum
-"0x8e4cbBcc33dB6c0a18561fDE1F6bA35906d4848b", // MEZO token on ETH (bridged to Ethereum)
+  // MUSD_ETHEREUM ,//MUSD ethereum
+// "0x8e4cbBcc33dB6c0a18561fDE1F6bA35906d4848b", // MEZO token on ETH (bridged to Ethereum)
 ];
 
 
@@ -110,7 +111,7 @@ async function mezoChainTvl(api) {
     calls: poolAddresses.map(p => ({ target: p })),
   });
 
-  // Group unique tokens per pool, then call sumTokens once per pool
+//   // Group unique tokens per pool, then call sumTokens once per pool
   for (let i = 0; i < poolAddresses.length; i++) {
     const tokens = [];
     if (token0s[i]) tokens.push(token0s[i]);
@@ -127,12 +128,12 @@ async function mezoChainTvl(api) {
 await api.sumTokens({ owner: VEBTC_CONTRACT,  tokens: [ADDRESSES.mezo.BTC]  });
 await api.sumTokens({ owner: VEMEZO_CONTRACT, tokens: [ADDRESSES.mezo.MEZO] });
 
-  // Read totalSupply() from known Mezo vault contracts and add as token balances.
+  // // Read totalSupply() from known Mezo vault contracts and add as token balances.
   const vaultTokenMap = {
-    [MUSD_SAVINGS_VAULT]: ADDRESSES.mezo.MUSD,
+    // [MUSD_SAVINGS_VAULT]: ADDRESSES.mezo.MUSD,
     [cbBTC_VAULT]: ADDRESSES.mezo.mcbBTC,
-    [BTC_VAULT]: ADDRESSES.mezo.mFBTC,
-    [stableCoinVaults]: ADDRESSES.mezo.mUSDC,
+    [BTC_VAULT]: ADDRESSES.mezo.BTC,
+    [stableCoinVaults]: ADDRESSES.mezo.mUSDC
   };
 
   const abi = 'function totalSupply() view returns (uint256)';
@@ -148,8 +149,21 @@ await api.sumTokens({ owner: VEMEZO_CONTRACT, tokens: [ADDRESSES.mezo.MEZO] });
     }
   }));
 
+//strategy vault
+  await api.sumTokens({
+    owner: "0x0C0944713c185ea3e64F5609ECee3fB3C054a295",
+    tokens: [ADDRESSES.mezo.MUSD],
+  });
+//Idle
+  await api.sumTokens({
+    owner: "0xb4D498029af77680cD1eF828b967f010d06C51CC",
+    tokens: [ADDRESSES.mezo.MUSD],
+  });
+
+
   // Merge TroveManager (Liquity) collateral into the same api instance
   await liquityTVL(api);
+  
 
   return api.getBalances();
 }
