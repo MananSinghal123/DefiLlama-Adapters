@@ -25,7 +25,7 @@ async function getBsktPairs(api) {
         getLogs2({ api, eventAbi: basketCreatedAbiV2, target: cfg.factory, fromBlock: cfg.fromBlock, extraKey: 'BSKTCreated-v2' }),
         getLogs2({ api, eventAbi: basketCreatedAbiV3, target: cfg.factory, fromBlock: cfg.fromBlock, extraKey: 'BSKTCreated-v3' }),
     ])
-    return [...logsV1, ...logsV2, ...logsV3].map(l => l.bsktPair)
+    return [...new Set([...logsV1, ...logsV2, ...logsV3].map(l => l.bsktPair))]
 }
 
 async function tvl(api) {
