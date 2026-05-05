@@ -129,25 +129,45 @@ await api.sumTokens({ owner: VEBTC_CONTRACT,  tokens: [ADDRESSES.mezo.BTC]  });
 await api.sumTokens({ owner: VEMEZO_CONTRACT, tokens: [ADDRESSES.mezo.MEZO] });
 
   // // Read totalSupply() from known Mezo vault contracts and add as token balances.
-  const vaultTokenMap = {
-    // [MUSD_SAVINGS_VAULT]: ADDRESSES.mezo.MUSD,
-    [cbBTC_VAULT]: ADDRESSES.mezo.mcbBTC,
-    [BTC_VAULT]: ADDRESSES.mezo.BTC,
-    [stableCoinVaults]: ADDRESSES.mezo.mUSDC
-  };
+  // const vaultTokenMap = {
+  //   // [MUSD_SAVINGS_VAULT]: ADDRESSES.mezo.MUSD,
+  //   [cbBTC_VAULT]: ADDRESSES.mezo.mcbBTC,
+  //   [BTC_VAULT]: ADDRESSES.mezo.BTC,
+  //   [stableCoinVaults]: ADDRESSES.mezo.mUSDC
+  // };
 
-  const abi = 'function totalSupply() view returns (uint256)';
-  const vaults = Object.keys(vaultTokenMap).filter(Boolean);
+  // const abi = 'function totalSupply() view returns (uint256)';
+  // const vaults = Object.keys(vaultTokenMap).filter(Boolean);
 
-  await Promise.all(vaults.map(async (vault) => {
-    try {
-      const supply = await api.call({ target: vault, abi });
-      const token = vaultTokenMap[vault];
-      if (supply && token) api.add(token, supply);
-    } catch (e) {
-      console.log('mezo: failed to read totalSupply for', vault, e.message || e.toString());
-    }
-  }));
+  // await Promise.all(vaults.map(async (vault) => {
+  //   try {
+  //     const supply = await api.call({ target: vault, abi });
+  //     const token = vaultTokenMap[vault];
+  //     if (supply && token) api.add(token, supply);
+  //   } catch (e) {
+  //     console.log('mezo: failed to read totalSupply for', vault, e.message || e.toString());
+  //   }
+  // }));
+
+const vaultTokenMap = {
+  [cbBTC_VAULT]:      ADDRESSES.mezo.mcbBTC,
+  [BTC_VAULT]:        ADDRESSES.mezo.BTC,
+  [stableCoinVaults]: ADDRESSES.mezo.mUSDC,
+};
+
+const vaults = Object.keys(vaultTokenMap).filter(Boolean);
+
+const totalSharesResults = await api.multiCall({
+  abi: 'function totalShares() view returns (uint256)',
+  calls: vaults.map(v => ({ target: v })),
+});
+
+vaults.forEach((vault, i) => {
+  const token = vaultTokenMap[vault];
+  const shares = totalSharesResults[i];
+  if (token && shares) api.add(token, shares);
+});
+
 
 //strategy vault
   await api.sumTokens({
