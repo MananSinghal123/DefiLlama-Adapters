@@ -563,8 +563,7 @@ function getCuratorExport(configs) {
     // methodology
     methodology: configs.methodology ? configs.methodology : 'Count all deposited assets in curated vaults.',
 
-    // start
-    ...(configs.start !== undefined ? { start: configs.start } : {}),
+    start: configs.start
   }
 
   for (const [chain, vaultConfigs] of Object.entries(configs.blockchains)) {
