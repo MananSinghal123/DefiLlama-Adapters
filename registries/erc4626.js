@@ -275,6 +275,10 @@ const configs = {
   'defimarketplus': {
     arbitrum: ['0x07fF8bCe905CB285220e4D96d8443cfCF141af8b'],
     methodology: 'TVL = SafeUsdVault.totalAssets() (idle USDC + USDC deployed to whitelisted lending strategies, minus unvested locked-profit).'
+  },
+  'xeno-money': {
+    base: ['0xC6Aad7c41c66bDC5E138fbd4180cDd3dB0F4fB3F'],
+    methodology: 'TVL is the total ISKe deposited in the sISKe ERC-4626 earn vault, measured via totalAssets().'
   }
 }
 
