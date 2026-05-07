@@ -302,28 +302,6 @@ const MARKET_BLACKLIST = {
   ],
 };
 
-// Extra ERC20s that may sit alongside the underlying inside a
-// StableERC4626ForCustomize pool's Gnosis Safe `thirdPool` (e.g. XAUe held next
-// to XAUt).
-//
-// DefiLlama's price service has no oracle for XAUe, so reading its balance
-// directly would silently drop ~$18M on Ethereum. Each entry therefore carries
-// a `priceableToken` + `divisor` so the raw balance is converted to an
-// equivalent raw amount of a token DefiLlama can price.
-//
-// XAUe: 1 token = 0.001 troy oz, 18 decimals.
-// XAUt: 1 token = 1 troy oz, 6 decimals.
-// raw_xaut = raw_xaue * 0.001 / 10^18 * 10^6 = raw_xaue / 10^15.
-const SAFE_EQUIVALENT_TOKENS = {
-  ethereum: [
-    {
-      token: "0xd5D6840ed95F58FAf537865DcA15D5f99195F87a", // XAUe
-      priceableToken: "0x68749665FF8D2d112Fa859AA293F07A622782F38", // XAUt
-      divisor: 10n ** 15n,
-    },
-  ],
-};
-
 // TermMaxViewer (per-chain). Used to surface unclaimed pool rewards for
 // ERC4626 pools whose principal sits in another ERC4626 (For4626 + Customize-
 // ERC20). Aave-backed pools must NOT use this — accrued interest already
@@ -712,35 +690,19 @@ async function erc4626VaultsTvl(api) {
     tokensAndOwners.push([thirdPools[i], vault])
   })
 
-  // StableERC4626ForCustomize: thirdPool may be either an ERC4626/ERC20 (same
-  // accrual story as For4626) OR a Gnosis Safe (XAUt vault on Ethereum). Probe
-  // totalSupply() to disambiguate — the Safe contract does not implement it.
-  // Dedupe on (underlying, safe) and on safe alone — multiple vaults can share
-  // a Safe, and we must count its holdings once.
+  // StableERC4626ForCustomize: thirdPool may be either an ERC4626/ERC20 OR a
+  // Gnosis Safe. Probe totalSupply() to disambiguate — the Safe contract does
+  // not implement it. Safe-backed pools are excluded per DefiLlama methodology.
   const customizeUnderlyings = await api.multiCall({ abi: 'address:underlying', calls: customizeVaults })
   const customizeThirdPools = await api.multiCall({ abi: 'address:thirdPool', calls: customizeVaults })
   const thirdPoolSupplies = await api.multiCall({ abi: 'erc20:totalSupply', calls: customizeThirdPools, permitFailure: true })
-  const seenSafeOwners = new Set();
-  const safeBackedSafes = new Set();
   customizeVaults.forEach((vault, i) => {
-    const underlying = customizeUnderlyings[i];
-    const thirdPool = customizeThirdPools[i];
-    const isErc20ThirdPool = thirdPoolSupplies[i] !== null;
-    if (isErc20ThirdPool) {
-      tokensAndOwners.push([underlying, vault]);
-      tokensAndOwners.push([thirdPool, vault]);
-    } else {
-      const key = `${underlying.toLowerCase()}|${thirdPool.toLowerCase()}`;
-      if (!seenSafeOwners.has(key)) {
-        seenSafeOwners.add(key);
-        tokensAndOwners.push([underlying, thirdPool]);
-      }
-      safeBackedSafes.add(thirdPool.toLowerCase());
-    }
+    if (thirdPoolSupplies[i] === null) return;
+    tokensAndOwners.push([customizeUnderlyings[i], vault]);
+    tokensAndOwners.push([customizeThirdPools[i], vault]);
   })
 
   await sumTokens2({ api, tokensAndOwners });
-  await addSafeEquivalentBalances(api, [...safeBackedSafes]);
   await addUnclaimedPoolRewards(api, {
     stableERC4626For4626Vaults,
     stableUnderlyings,
@@ -748,34 +710,6 @@ async function erc4626VaultsTvl(api) {
     customizeUnderlyings,
     thirdPoolSupplies,
   });
-}
-
-// XAUe and similar non-priceable equivalents are remapped to a priceable
-// canonical token (e.g. XAUt) at a fixed raw-unit ratio. balanceOf is batched
-// over (safe x equivalent) pairs.
-async function addSafeEquivalentBalances(api, safeAddresses) {
-  if (safeAddresses.length === 0) return;
-  const equivalents = SAFE_EQUIVALENT_TOKENS[api.chain] ?? [];
-  if (equivalents.length === 0) return;
-
-  const calls = [];
-  for (const safe of safeAddresses) {
-    for (const eq of equivalents) {
-      calls.push({ target: eq.token, params: [safe] });
-    }
-  }
-  const balances = await api.multiCall({ abi: 'erc20:balanceOf', calls });
-
-  let idx = 0;
-  for (const safe of safeAddresses) {
-    for (const eq of equivalents) {
-      const raw = BigInt(balances[idx++] ?? '0');
-      if (raw === 0n) continue;
-      const remapped = raw / eq.divisor;
-      if (remapped === 0n) continue;
-      api.add(eq.priceableToken, remapped.toString());
-    }
-  }
 }
 
 // For4626 and Customize-ERC20 pools route deposits into another ERC4626 where
